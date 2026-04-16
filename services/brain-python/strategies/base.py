@@ -1,13 +1,18 @@
 """
 BaseStrategy — Protocol for all AlphaWolf strategies.
 
-Every strategy receives MarketData ticks and returns a list of TradeIntents.
-The brain-python main loop handles ZMQ I/O; strategies are pure logic.
+Strategies are pure Python logic: receive TickSnapshot, return list[SignalIntent].
+No Protobuf, no ZMQ, no I/O — the main loop handles all transport concerns.
+
+To add a new strategy:
+  1. Create strategies/your_strategy.py
+  2. Implement this Protocol (on_tick + reset_daily + name + symbols)
+  3. Register it in strategies/__init__.py REGISTRY
+  4. Add its config block to config/strategies.yaml
 """
 from typing import Protocol, runtime_checkable
-import sys
-sys.path.insert(0, ".")
-from proto import messages_pb2 as pb
+
+from .types import TickSnapshot, SignalIntent
 
 
 @runtime_checkable
@@ -15,28 +20,28 @@ class BaseStrategy(Protocol):
     """
     Minimal interface every strategy must implement.
 
-    Contract:
-      - on_tick() is called for every incoming MarketData message.
-      - Returns [] if no signal, or a list of TradeIntents to publish.
-      - Must be stateless across strategy instances (state lives inside the object).
-      - Must NOT call ZMQ or any I/O directly — return intents, let main loop publish.
+    Contracts:
+      - on_tick() must be pure (no side effects, no I/O)
+      - Returns [] for no signal, [SignalIntent, ...] when signal fires
+      - State is owned by the strategy object — main loop is stateless
+      - reset_daily() is called once at the start of each trading session
     """
 
-    name: str       # unique strategy identifier (used in TradeIntent.strategy_id)
-    symbols: list   # symbols this strategy is interested in
+    name:    str        # unique ID — used as TradeIntent.strategy_id
+    symbols: list[str]  # symbols this strategy consumes
 
-    def on_tick(self, tick: "pb.MarketData") -> "list[pb.TradeIntent]":
+    def on_tick(self, tick: TickSnapshot) -> list[SignalIntent]:
         """
         Process one market tick.
 
         Args:
-            tick: Deserialized MarketData protobuf message.
+            tick: Normalized market snapshot (broker-agnostic).
 
         Returns:
-            List of TradeIntent messages to publish (empty = no signal).
+            List of trading signals. Empty list = no action.
         """
         ...
 
     def reset_daily(self) -> None:
-        """Reset intraday state. Called at start of each trading day."""
+        """Reset all intraday state. Called once per trading day."""
         ...

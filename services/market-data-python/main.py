@@ -4,9 +4,9 @@ market-data-python — AlphaWolf 3.0v
 Publishes MarketData to the ZMQ event bus.
 Topic: "market.data"
 
-Broker selection via environment variable:
-  BROKER_MODE=paper  → PaperBroker (no IB required)
-  BROKER_MODE=live   → IBGatewayBroker (requires IB Gateway)
+Broker selection:
+  BROKER_MODE=paper  → PaperBroker (no IB required, Phase 1–6)
+  BROKER_MODE=live   → IBGatewayBroker (requires IB Gateway, Phase 7+)
 """
 import asyncio
 import logging
@@ -25,7 +25,6 @@ sys.path.insert(0, ".")
 from broker import PaperBroker
 from broker.protocol import TickData
 
-# ── Protobuf stubs (generated — do not edit) ──
 from proto import messages_pb2 as pb
 
 logging.basicConfig(
@@ -34,26 +33,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger("market-data")
 
-# ── Config from environment ────────────────────
-BROKER_MODE   = os.getenv("BROKER_MODE", "paper").lower()
-ZMQ_PUB_PORT  = int(os.getenv("ZMQ_PUB_PORT", "5555"))
-SYMBOLS       = os.getenv("SYMBOLS", "AAPL,TSLA,SPY,QQQ").split(",")
-IB_HOST       = os.getenv("IB_HOST", "ib-gateway")
-IB_PORT       = int(os.getenv("IB_PORT", "4002"))
-IB_CLIENT_ID  = int(os.getenv("IB_CLIENT_ID", "1"))
-HEARTBEAT_S   = int(os.getenv("HEARTBEAT_INTERVAL_S", "10"))
+# ── Config ─────────────────────────────────────────────────────────────────────
+BROKER_MODE  = os.getenv("BROKER_MODE", "paper").lower()
+ZMQ_PUB_PORT = int(os.getenv("ZMQ_PUB_PORT", "5555"))
+SYMBOLS      = os.getenv("SYMBOLS", "AAPL,TSLA,SPY,QQQ").split(",")
+IB_HOST      = os.getenv("IB_HOST", "ib-gateway")
+IB_PORT      = int(os.getenv("IB_PORT", "4002"))
+IB_CLIENT_ID = int(os.getenv("IB_CLIENT_ID", "1"))
+HEARTBEAT_S  = int(os.getenv("HEARTBEAT_INTERVAL_S", "10"))
 
 
 def build_broker():
     if BROKER_MODE == "paper":
         logger.info("Mode: PAPER (simulated data)")
         return PaperBroker(tick_interval_s=1.0)
-
     if BROKER_MODE in ("live", "ib"):
-        logger.info(f"Mode: IB GATEWAY → {IB_HOST}:{IB_PORT}")
+        logger.info("Mode: IB GATEWAY → %s:%s", IB_HOST, IB_PORT)
         from broker.ib_gateway import IBGatewayBroker
         return IBGatewayBroker(host=IB_HOST, port=IB_PORT, client_id=IB_CLIENT_ID)
-
     raise ValueError(f"Unknown BROKER_MODE: {BROKER_MODE!r}. Use 'paper' or 'live'.")
 
 
@@ -86,31 +83,50 @@ async def main() -> None:
     ctx = zmq.asyncio.Context()
     pub = ctx.socket(zmq.PUB)
     pub.bind(f"tcp://*:{ZMQ_PUB_PORT}")
-    logger.info(f"ZMQ PUB bound → tcp://*:{ZMQ_PUB_PORT}")
-    logger.info(f"Symbols: {SYMBOLS}")
+    logger.info("ZMQ PUB bound → tcp://*:%s", ZMQ_PUB_PORT)
+    logger.info("Symbols: %s", SYMBOLS)
 
     broker = build_broker()
     await broker.connect()
 
-    asyncio.create_task(publish_heartbeat(pub))
+    # Heartbeat task — keep reference for clean shutdown + exception surfacing
+    hb_task = asyncio.create_task(publish_heartbeat(pub), name="heartbeat")
+    hb_task.add_done_callback(_task_error_logger)
 
     published = 0
     try:
         async for tick in broker.stream_ticks(SYMBOLS):
-            msg = tick_to_proto(tick)
-            pub.send_multipart([
-                b"market.data",
-                msg.SerializeToString(),
-            ])
-            published += 1
-            if published % 100 == 0:
-                logger.info(f"Published {published} ticks | last: {tick.symbol} @ {tick.price:.4f}")
+            try:
+                msg = tick_to_proto(tick)
+                pub.send_multipart([b"market.data", msg.SerializeToString()])
+                published += 1
+                if published % 100 == 0:
+                    logger.info(
+                        "Published %d ticks | last: %s @ %.4f",
+                        published, tick.symbol, tick.price,
+                    )
+            except Exception as exc:
+                logger.error(
+                    "Tick publish error for %s (skipping): %s",
+                    tick.symbol, exc, exc_info=True,
+                )
     except KeyboardInterrupt:
         logger.info("Shutting down market-data-python...")
     finally:
+        hb_task.cancel()
+        try:
+            await hb_task
+        except asyncio.CancelledError:
+            pass
         await broker.disconnect()
         pub.close()
         ctx.term()
+
+
+def _task_error_logger(task: asyncio.Task) -> None:
+    """Log unexpected task failures (not cancellations)."""
+    if not task.cancelled() and task.exception():
+        logger.error("Background task '%s' died: %s", task.get_name(), task.exception())
 
 
 if __name__ == "__main__":
