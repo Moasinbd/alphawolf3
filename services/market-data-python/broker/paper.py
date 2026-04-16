@@ -16,14 +16,38 @@ from .protocol import MarketDataBroker, TickData
 logger = logging.getLogger(__name__)
 
 # Base prices for simulation
+# XETRA (EUR) — DAX 40 blue chips
+# US markets — legacy / alternative universe
 _BASE_PRICES: dict[str, float] = {
+    # ── XETRA / DAX 40 ────────────────────────────────
+    "SAP":    185.0,    # SAP SE
+    "SIE":    180.0,    # Siemens AG
+    "ALV":    295.0,    # Allianz SE
+    "DTE":     22.5,    # Deutsche Telekom AG
+    "BAS":     46.0,    # BASF SE
+    "VOW3":   115.0,    # Volkswagen AG (preference shares)
+    "DBK":     15.5,    # Deutsche Bank AG
+    "MBG":     66.0,    # Mercedes-Benz Group AG
+    "BMW":     85.0,    # BMW AG
+    "ADS":    215.0,    # Adidas AG
+    "EOAN":    12.5,    # E.ON SE
+    "RWE":     30.0,    # RWE AG
+    "BAYN":    29.0,    # Bayer AG
+    "MRK":    165.0,    # Merck KGaA
+    "HEI":    185.0,    # Heidelberg Materials AG
+    # ── XETRA ETFs (EURO STOXX / DAX trackers) ───────
+    "EXW1":   160.0,    # iShares Core DAX UCITS ETF
+    "EXSA":   540.0,    # iShares Core EURO STOXX 50 UCITS ETF
+    "CSSX5E": 542.0,    # Amundi EURO STOXX 50 II ETF
+    "EXV1":    13.0,    # iShares STOXX Europe 600 Banks
+    # ── US markets (legacy) ───────────────────────────
     "AAPL":   185.0,
     "TSLA":   250.0,
     "NVDA":   850.0,
     "SPY":    520.0,
     "QQQ":    450.0,
     "BTCUSD": 67000.0,
-    "ETHUSD": 3500.0,
+    "ETHUSD":  3500.0,
 }
 
 _DEFAULT_PRICE = 100.0

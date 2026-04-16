@@ -1,31 +1,87 @@
 # ─────────────────────────────────────────────────────────────
 # Risk Limits — risk-engine-rust configuration
 # All values are hard limits. Violating any → order rejected.
+#
+# Capital tiers (update as account grows):
+#   Tier 1: €100     ← current
+#   Tier 2: €500     ← 1st scaling milestone
+#   Tier 3: €2000    ← full DAX universe
+#   Tier 4: €10000+  ← professional parameters
 # ─────────────────────────────────────────────────────────────
 
+# ── Portfolio-level limits ─────────────────────────────────
 portfolio:
-  max_drawdown_pct: 10.0        # halt trading if drawdown exceeds 10%
-  max_gross_exposure_pct: 80.0  # max % of capital deployed at once
-  max_daily_loss_usd: 500.0     # hard stop after losing $500 in a day
+  max_drawdown_pct: 15.0        # halt trading if drawdown exceeds 15% (allow for XETRA volatility)
+  max_gross_exposure_pct: 60.0  # max % of capital deployed at once (conservative for small capital)
+  max_daily_loss_eur: 15.0      # hard stop after losing €15 in a day (~15% of €100 account)
+  currency: EUR                 # base currency
 
+# ── Per-position limits ────────────────────────────────────
 position:
-  max_size_pct: 10.0            # no single position > 10% of capital
-  max_qty_per_order: 1000       # hard cap on shares per single order
-  min_confidence: 0.60          # reject signals below 60% confidence
+  max_size_pct: 15.0            # no single position > 15% of capital (€15 max at Tier 1)
+  max_qty_per_order: 500        # hard cap on shares per order
+  min_confidence: 0.65          # reject signals below 65% confidence (strategy minimum)
 
+# ── Per-order limits ───────────────────────────────────────
 order:
-  min_order_value_usd: 100.0    # no micro orders
-  max_order_value_usd: 5000.0   # no single order > $5000
+  min_order_value_eur: 10.0     # IBKR minimum order size consideration
+  max_order_value_eur: 50.0     # never more than 50% of account on one order at Tier 1
+  # Commission awareness: IBKR charges ~€1-2/order on XETRA
+  # At €10 order: 10-20% commission cost → avoid
+  # At €50+ order: 2-4% commission cost → acceptable
 
-# Symbols that can never be traded (blacklist)
-blacklist: []
+# ── Scaling tiers (reference, not enforced automatically) ──
+# Adjust the values above when capital crosses these levels:
+scaling:
+  tier_1:
+    capital_eur: 100
+    max_order_value_eur: 50
+    max_daily_loss_eur: 15
+    max_size_pct: 15
+  tier_2:
+    capital_eur: 500
+    max_order_value_eur: 200
+    max_daily_loss_eur: 50
+    max_size_pct: 10
+  tier_3:
+    capital_eur: 2000
+    max_order_value_eur: 800
+    max_daily_loss_eur: 150
+    max_size_pct: 8
+  tier_4:
+    capital_eur: 10000
+    max_order_value_eur: 5000
+    max_daily_loss_eur: 500
+    max_size_pct: 5
 
-# Only these symbols are allowed (empty = all allowed)
+# ── Blacklist ──────────────────────────────────────────────
+blacklist: []   # symbols that can NEVER be traded
+
+# ── Whitelist ─────────────────────────────────────────────
+# Only these symbols are tradeable (empty = all allowed)
 whitelist:
+  # DAX 40 core
+  - SAP
+  - SIE
+  - ALV
+  - DTE
+  - BAS
+  - VOW3
+  - DBK
+  - MBG
+  - BMW
+  - ADS
+  - EOAN
+  - RWE
+  - BAYN
+  # EURO STOXX ETFs
+  - EXW1
+  - EXSA
+  - CSSX5E
+  - EXV1
+  # US (keep for paper testing / future expansion)
   - AAPL
   - TSLA
   - NVDA
   - SPY
   - QQQ
-  - BTCUSD
-  - ETHUSD

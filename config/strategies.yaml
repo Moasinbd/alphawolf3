@@ -1,23 +1,51 @@
 # ─────────────────────────────────────────────────────────────
 # Strategy Configuration — brain-python
+#
+# Active strategy: orb_xetra
+# Market: XETRA (Deutsche Börse) — DAX 40 blue chips
+# Session: 09:00–17:30 CET (Europe/Berlin)
 # ─────────────────────────────────────────────────────────────
 
 active_strategies:
-  - vix_momentum
+  - orb_xetra
 
 strategies:
-  vix_momentum:
+  orb_xetra:
     enabled: true
+
+    # ── Universe ────────────────────────────────────────────
+    # IB ticker symbols on XETRA exchange (SMART routing via IB)
+    # Paper mode uses these symbols with simulated prices
+    #
+    # Tier 1 — DAX 40 core (highest liquidity, tightest spreads)
+    # Tier 2 — EURO STOXX 50 ETFs (broad Eurozone exposure, very liquid)
     symbols:
-      - SPY
-      - QQQ
-      - AAPL
-      - TSLA
-      - NVDA
-    # Signal parameters
-    momentum_period: 20          # bars for momentum calculation
-    signal_threshold: 0.02       # minimum price move to generate signal
-    min_confidence: 0.65         # minimum confidence to publish intent
-    # Position sizing
-    position_size_pct: 5.0       # % of capital per trade
-    max_open_positions: 5        # concurrent open positions
+      # Tier 1: DAX 40 blue chips
+      - SAP      # SAP SE                  — tech, highest market cap DAX
+      - SIE      # Siemens AG              — industrial, consistent trends
+      - ALV      # Allianz SE              — financials, low intraday noise
+      - DTE      # Deutsche Telekom AG     — telecom, steady volume
+      - BAS      # BASF SE                 — chemicals, volatile on news
+      - VOW3     # Volkswagen AG           — auto sector, high beta
+      - DBK      # Deutsche Bank AG        — high vol, strong breakouts
+      - MBG      # Mercedes-Benz Group AG  — auto, clean range behavior
+      - BMW      # BMW AG                  — auto, correlated with MBG
+      - ADS      # Adidas AG               — consumer discretionary
+      # Tier 2: EURO STOXX 50 (broader Eurozone)
+      - EXW1     # iShares Core DAX ETF    — DAX tracker, ultra-liquid
+      - EXSA     # iShares EURO STOXX 50   — 50 Eurozone blue chips ETF
+
+    # ── Opening Range parameters ────────────────────────────
+    opening_range_min: 15       # 09:00–09:15 CET (first 15 min of session)
+    volume_multiplier: 1.5      # tick volume must be > 1.5x range avg to confirm breakout
+    risk_reward: 2.0            # take profit = entry ± (range_size * 2.0)
+
+    # ── Signal quality thresholds ───────────────────────────
+    min_confidence: 0.65        # signals below this are discarded by risk engine
+
+    # ── Position sizing ─────────────────────────────────────
+    position_size_pct: 5.0      # % of available capital per signal (risk engine enforces)
+
+    # ── Paper mode (Phase 1–6) ──────────────────────────────
+    # PAPER_FORCE_SIGNALS=true env var bypasses CET market hours.
+    # Strategy uses a rolling 15-min window for continuous paper testing.

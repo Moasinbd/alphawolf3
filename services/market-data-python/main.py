@@ -14,6 +14,10 @@ import os
 import sys
 import time
 
+# Windows: use SelectorEventLoop for ZMQ asyncio compatibility
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import zmq
 import zmq.asyncio
 
