@@ -16,6 +16,10 @@ import os
 import sys
 import time
 
+# Windows: use SelectorEventLoop for ZMQ asyncio compatibility
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import zmq
 import zmq.asyncio
 
@@ -36,7 +40,6 @@ BROKER_MODE     = os.getenv("BROKER_MODE", "paper").lower()
 ZMQ_SUB_HOST    = os.getenv("ZMQ_SUB_HOST", "risk-engine")
 ZMQ_SUB_PORT    = int(os.getenv("ZMQ_SUB_PORT", "5557"))
 ZMQ_PUB_PORT    = int(os.getenv("ZMQ_PUB_PORT", "5558"))
-ZMQ_HB_PORT     = int(os.getenv("ZMQ_HB_PORT", "5561"))
 INITIAL_CAPITAL = float(os.getenv("INITIAL_CAPITAL", "100000"))
 IB_HOST         = os.getenv("IB_HOST", "ib-gateway")
 IB_PORT         = int(os.getenv("IB_PORT", "4002"))

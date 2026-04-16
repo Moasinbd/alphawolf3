@@ -24,7 +24,7 @@ import logging
 import os
 import time as time_module
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -75,7 +75,6 @@ class ORBXetraStrategy:
 
     # XETRA trading window (CET/CEST — Europe/Berlin)
     _MARKET_OPEN  = time(9, 0)
-    _RANGE_END    = time(9, 15)
     _MARKET_CLOSE = time(17, 0)
 
     def __init__(self, config: dict) -> None:
@@ -85,6 +84,10 @@ class ORBXetraStrategy:
         self._rr: float           = float(config.get("risk_reward",       2.0))
         self._min_conf: float     = float(config.get("min_confidence",    0.65))
         self._pos_pct: float      = float(config.get("position_size_pct", 5.0))
+
+        # Pre-compute range end time — avoids ValueError if range_minutes > 59
+        _open_dt = datetime(2000, 1, 1, self._MARKET_OPEN.hour, self._MARKET_OPEN.minute)
+        self._range_end: time = (_open_dt + timedelta(minutes=self._range_minutes)).time()
 
         # Paper-mode: bypass market hours check, use rolling window
         self._paper: bool = os.getenv("PAPER_FORCE_SIGNALS", "false").lower() == "true"
@@ -141,11 +144,7 @@ class ORBXetraStrategy:
             return []
 
         # During opening range: accumulate stats
-        range_end = time(
-            self._MARKET_OPEN.hour,
-            self._MARKET_OPEN.minute + self._range_minutes,
-        )
-        if t < range_end:
+        if t < self._range_end:
             self._accumulate(state, tick)
             return []
 
@@ -251,7 +250,7 @@ class ORBXetraStrategy:
             intents.append(intent)
 
         # ── SELL breakout ─────────────────────────────
-        elif (
+        if (
             not state.sell_fired
             and tick.price < state.range_low
             and vol_ratio >= self._vol_mult

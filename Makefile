@@ -38,22 +38,22 @@ proto:
 
 phase1:
 	@echo "Starting AlphaWolf 3.0v [PHASE 1 — market-data pipeline only]"
-	BROKER_MODE=paper docker compose up -d market-data
+	BROKER_MODE=paper PAPER_FORCE_SIGNALS=true docker compose up -d market-data
 	@echo "market-data running on :5555. Validate: make logs | grep market-data"
 
 phase2:
 	@echo "Starting AlphaWolf 3.0v [PHASE 2 — market-data + brain]"
-	BROKER_MODE=paper docker compose up -d market-data brain
+	BROKER_MODE=paper PAPER_FORCE_SIGNALS=true docker compose up -d market-data brain
 	@echo "Stack running. Tail logs: make logs"
 
 phase3:
 	@echo "Starting AlphaWolf 3.0v [PHASE 3 — market-data + brain + risk-engine]"
-	BROKER_MODE=paper docker compose up -d market-data brain risk-engine
+	BROKER_MODE=paper PAPER_FORCE_SIGNALS=true docker compose up -d market-data brain risk-engine
 	@echo "Stack running. Tail logs: make logs"
 
 paper:
 	@echo "Starting AlphaWolf 3.0v [PAPER MODE — full stack, simulated data]"
-	BROKER_MODE=paper docker compose up -d market-data brain risk-engine executor analytics questdb
+	BROKER_MODE=paper PAPER_FORCE_SIGNALS=true docker compose up -d market-data brain risk-engine executor analytics questdb
 	@echo "Stack running. Tail logs: make logs"
 
 ib-paper: _check-ib-credentials

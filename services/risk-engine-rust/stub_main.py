@@ -2,7 +2,15 @@
 risk-engine stub (Python) — Phase 1-2 placeholder.
 
 Approves all TradeIntents until the Rust engine is implemented in Phase 3.
-This file is only used during early phases for pipeline validation.
+
+CRITICAL FIX: publishes pb.Order on "risk.approved" (not RiskVerdict).
+executor-python expects Order messages. RiskVerdict goes on "risk.rejected".
+
+Pipeline contract:
+  IN:  signal.intent  → pb.TradeIntent   (from brain-python)
+  OUT: risk.approved  → pb.Order         (executor-python reads this)
+  OUT: risk.rejected  → pb.RiskVerdict   (analytics reads this, approved=false)
+  OUT: system.heartbeat
 """
 import asyncio
 import logging
@@ -13,6 +21,10 @@ import uuid
 
 import zmq
 import zmq.asyncio
+
+# Windows: use SelectorEventLoop for ZMQ asyncio compatibility
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 sys.path.insert(0, ".")
 from proto import messages_pb2 as pb
@@ -28,6 +40,21 @@ ZMQ_SUB_PORT     = int(os.getenv("ZMQ_SUB_PORT", "5556"))
 ZMQ_PUB_APPROVED = int(os.getenv("ZMQ_PUB_APPROVED", "5557"))
 ZMQ_PUB_REJECTED = int(os.getenv("ZMQ_PUB_REJECTED", "5559"))
 HEARTBEAT_S      = int(os.getenv("HEARTBEAT_INTERVAL_S", "10"))
+
+
+def intent_to_order(intent: pb.TradeIntent) -> pb.Order:
+    """Convert approved TradeIntent → Order for executor-python."""
+    return pb.Order(
+        order_id=str(uuid.uuid4()),
+        symbol=intent.symbol,
+        action=intent.action,
+        quantity=intent.quantity,
+        order_type=pb.OrderType.MKT,   # stub always uses market orders
+        limit_price=0.0,
+        stop_price=0.0,
+        strategy_id=intent.strategy_id,
+        ts_ns=intent.ts_ns,
+    )
 
 
 async def publish_heartbeat(pub: zmq.asyncio.Socket) -> None:
@@ -53,10 +80,13 @@ async def main() -> None:
     pub = ctx.socket(zmq.PUB)
     pub.bind(f"tcp://*:{ZMQ_PUB_APPROVED}")
     pub.bind(f"tcp://*:{ZMQ_PUB_REJECTED}")
-    logger.info(f"PUB approved → tcp://*:{ZMQ_PUB_APPROVED}")
-    logger.info(f"PUB rejected → tcp://*:{ZMQ_PUB_REJECTED}")
+    logger.info(f"PUB approved (Order) → tcp://*:{ZMQ_PUB_APPROVED}")
+    logger.info(f"PUB rejected (RiskVerdict) → tcp://*:{ZMQ_PUB_REJECTED}")
 
-    logger.warning("risk-engine running as STUB — approves all intents. Phase 3 = real Rust engine.")
+    logger.warning(
+        "risk-engine running as STUB — approves all intents as MKT orders. "
+        "Phase 3 = real Rust engine with risk_limits.yaml validation."
+    )
     asyncio.create_task(publish_heartbeat(pub))
 
     approved = 0
@@ -67,19 +97,19 @@ async def main() -> None:
             intent.ParseFromString(data)
 
             t_start = time.time_ns()
-            verdict = pb.RiskVerdict(
-                intent=intent,
-                approved=True,
-                rejection_reason="",
-                approved_qty=intent.quantity,
-                latency_us=max(1, (time.time_ns() - t_start) // 1000),
-            )
-            pub.send_multipart([b"risk.approved", verdict.SerializeToString()])
+            order = intent_to_order(intent)
+            latency_us = max(1, (time.time_ns() - t_start) // 1000)
+
+            # Publish Order on risk.approved (executor expects pb.Order)
+            pub.send_multipart([b"risk.approved", order.SerializeToString()])
             approved += 1
+
+            action_name = pb.OrderAction.Name(intent.action)
             logger.info(
-                f"STUB APPROVED: {intent.action} {intent.quantity} {intent.symbol} "
-                f"[conf={intent.confidence:.2f}] #{approved}"
+                f"STUB APPROVED → Order | {action_name} {intent.quantity:.1f} {intent.symbol} "
+                f"[conf={intent.confidence:.2f} latency={latency_us}µs] #{approved}"
             )
+
     except KeyboardInterrupt:
         logger.info("Shutting down risk-engine stub...")
     finally:

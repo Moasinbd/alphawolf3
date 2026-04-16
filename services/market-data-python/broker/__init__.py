@@ -1,4 +1,4 @@
-from .protocol import MarketDataBroker, TickData, OrderResult
+from .protocol import MarketDataBroker, TickData
 from .paper import PaperBroker
 
-__all__ = ["MarketDataBroker", "TickData", "OrderResult", "PaperBroker"]
+__all__ = ["MarketDataBroker", "TickData", "PaperBroker"]

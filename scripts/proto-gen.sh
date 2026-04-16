@@ -39,6 +39,24 @@ python -m grpc_tools.protoc \
   "$PROTO_SRC"
 touch services/executor-python/proto/__init__.py
 
+# ── Python: risk-engine-rust (stub only — replaced by Rust in Phase 3) ──
+echo "[Python] risk-engine-rust (stub)..."
+mkdir -p services/risk-engine-rust/proto
+python -m grpc_tools.protoc \
+  -I="$PROTO_DIR" \
+  --python_out="services/risk-engine-rust/proto" \
+  "$PROTO_SRC"
+touch services/risk-engine-rust/proto/__init__.py
+
+# ── Python: analytics-java (stub only — replaced by Java in Phase 5) ──
+echo "[Python] analytics-java (stub)..."
+mkdir -p services/analytics-java/proto
+python -m grpc_tools.protoc \
+  -I="$PROTO_DIR" \
+  --python_out="services/analytics-java/proto" \
+  "$PROTO_SRC"
+touch services/analytics-java/proto/__init__.py
+
 # ── Go: risk-engine-go (future) / ingestor-go ─────────────────
 if command -v protoc-gen-go &>/dev/null; then
   echo "[Go] shared stubs..."

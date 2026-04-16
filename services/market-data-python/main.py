@@ -37,7 +37,6 @@ logger = logging.getLogger("market-data")
 # ── Config from environment ────────────────────
 BROKER_MODE   = os.getenv("BROKER_MODE", "paper").lower()
 ZMQ_PUB_PORT  = int(os.getenv("ZMQ_PUB_PORT", "5555"))
-ZMQ_HB_PORT   = int(os.getenv("ZMQ_HB_PORT", "5560"))
 SYMBOLS       = os.getenv("SYMBOLS", "AAPL,TSLA,SPY,QQQ").split(",")
 IB_HOST       = os.getenv("IB_HOST", "ib-gateway")
 IB_PORT       = int(os.getenv("IB_PORT", "4002"))
