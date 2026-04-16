@@ -8,13 +8,18 @@ help:
 	@echo ""
 	@echo "  AlphaWolf 3.0v — Available Commands"
 	@echo ""
-	@echo "  Development:"
-	@echo "    make proto       Regenerate Protobuf stubs for all services"
-	@echo "    make paper       Run full stack with simulated data (no IB)"
-	@echo "    make ib-paper    Run full stack with IB Gateway (paper account)"
+	@echo "  Phased Development:"
+	@echo "    make phase1      Phase 1: market-data only (ZMQ pipeline validation)"
+	@echo "    make phase2      Phase 2: market-data + brain"
+	@echo "    make phase3      Phase 3: market-data + brain + risk-engine"
+	@echo "    make paper       Full stack with simulated data (Phase 4+)"
+	@echo ""
+	@echo "  IB Gateway (Phase 7+):"
+	@echo "    make ib-paper    Full stack with IB Gateway (paper account)"
 	@echo "    make live        ⚠️  Run with live IB account (REAL MONEY)"
 	@echo ""
 	@echo "  Operations:"
+	@echo "    make proto       Regenerate Protobuf stubs for all services"
 	@echo "    make stop        Stop all containers"
 	@echo "    make logs        Tail logs for all services"
 	@echo "    make status      Show container health"
@@ -31,8 +36,23 @@ proto:
 
 # ── Run Modes ──────────────────────────────────────────────────────────
 
+phase1:
+	@echo "Starting AlphaWolf 3.0v [PHASE 1 — market-data pipeline only]"
+	BROKER_MODE=paper docker compose up -d market-data
+	@echo "market-data running on :5555. Validate: make logs | grep market-data"
+
+phase2:
+	@echo "Starting AlphaWolf 3.0v [PHASE 2 — market-data + brain]"
+	BROKER_MODE=paper docker compose up -d market-data brain
+	@echo "Stack running. Tail logs: make logs"
+
+phase3:
+	@echo "Starting AlphaWolf 3.0v [PHASE 3 — market-data + brain + risk-engine]"
+	BROKER_MODE=paper docker compose up -d market-data brain risk-engine
+	@echo "Stack running. Tail logs: make logs"
+
 paper:
-	@echo "Starting AlphaWolf 3.0v [PAPER MODE — simulated data]"
+	@echo "Starting AlphaWolf 3.0v [PAPER MODE — full stack, simulated data]"
 	BROKER_MODE=paper docker compose up -d market-data brain risk-engine executor analytics questdb
 	@echo "Stack running. Tail logs: make logs"
 

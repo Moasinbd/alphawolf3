@@ -6,12 +6,13 @@ WORKDIR /app
 COPY services/market-data-python/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Proto stubs
-COPY proto/ ./proto/
+# Proto stubs — generated at build time
+COPY proto/messages.proto ./proto/messages.proto
 RUN python -m grpc_tools.protoc \
     -I./proto \
     --python_out=./proto \
-    ./proto/messages.proto
+    ./proto/messages.proto \
+    && touch ./proto/__init__.py
 
 # Service source
 COPY services/market-data-python/ .

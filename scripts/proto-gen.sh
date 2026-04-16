@@ -14,10 +14,12 @@ echo ""
 
 # ── Python: market-data-python ────────────────────────────────
 echo "[Python] market-data-python..."
+mkdir -p services/market-data-python/proto
 python -m grpc_tools.protoc \
   -I="$PROTO_DIR" \
   --python_out="services/market-data-python/proto" \
   "$PROTO_SRC"
+touch services/market-data-python/proto/__init__.py
 
 # ── Python: brain-python ──────────────────────────────────────
 echo "[Python] brain-python..."
@@ -26,6 +28,7 @@ python -m grpc_tools.protoc \
   -I="$PROTO_DIR" \
   --python_out="services/brain-python/proto" \
   "$PROTO_SRC"
+touch services/brain-python/proto/__init__.py
 
 # ── Python: executor-python ───────────────────────────────────
 echo "[Python] executor-python..."
@@ -34,6 +37,7 @@ python -m grpc_tools.protoc \
   -I="$PROTO_DIR" \
   --python_out="services/executor-python/proto" \
   "$PROTO_SRC"
+touch services/executor-python/proto/__init__.py
 
 # ── Go: risk-engine-go (future) / ingestor-go ─────────────────
 if command -v protoc-gen-go &>/dev/null; then

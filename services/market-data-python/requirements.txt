@@ -1,3 +1,4 @@
 pyzmq==26.2.0
 protobuf==5.29.0
+grpcio-tools==1.68.1
 ib-insync==0.9.86   # Phase 7+ only — IB Gateway integration
