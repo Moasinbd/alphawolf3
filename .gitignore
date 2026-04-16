@@ -1,0 +1,54 @@
+# ─── Secrets ───────────────────────────────────
+.env
+*.env
+config/ib.env
+config/live.env
+
+# ─── Python ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ─── Go ────────────────────────────────────────
+*.exe
+*.test
+vendor/
+
+# ─── Rust ──────────────────────────────────────
+target/
+Cargo.lock
+
+# ─── Java ──────────────────────────────────────
+*.class
+*.jar
+*.war
+.gradle/
+build/
+.mvn/
+mvnw
+mvnw.cmd
+
+# ─── Generated proto stubs ─────────────────────
+services/*/proto/
+services/*/**/*_pb2*.py
+services/*/**/*.pb.go
+services/*/**/*_grpc*.py
+
+# ─── Docker ────────────────────────────────────
+.docker/
+
+# ─── Logs / Data ───────────────────────────────
+*.log
+*.csv
+data/
+
+# ─── IDE ───────────────────────────────────────
+.idea/
+.vscode/
+*.iml

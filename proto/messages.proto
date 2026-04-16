@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package alphawolf;
+
+// ─────────────────────────────────────────────
+// Go package options
+// ─────────────────────────────────────────────
+option go_package = "alphawolf/shared/proto;proto";
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum BrokerMode {
+  PAPER = 0;
+  LIVE  = 1;
+}
+
+enum OrderAction {
+  BUY  = 0;
+  SELL = 1;
+}
+
+enum OrderType {
+  MKT = 0;
+  LMT = 1;
+  STP = 2;
+}
+
+enum OrderStatus {
+  PENDING   = 0;
+  FILLED    = 1;
+  PARTIAL   = 2;
+  CANCELLED = 3;
+  REJECTED  = 4;
+}
+
+// ─────────────────────────────────────────────
+// Market Data — published by market-data-python
+// ZMQ topic: "market.data"
+// ─────────────────────────────────────────────
+message MarketData {
+  string symbol    = 1;
+  double price     = 2;
+  double bid       = 3;
+  double ask       = 4;
+  double volume    = 5;
+  uint64 ts_ns     = 6;  // nanoseconds UTC
+  BrokerMode source = 7; // PAPER=simulated, LIVE=real IB
+}
+
+// ─────────────────────────────────────────────
+// Trade Intent — published by brain-python
+// ZMQ topic: "signal.intent"
+// ─────────────────────────────────────────────
+message TradeIntent {
+  string strategy_id = 1;
+  string symbol      = 2;
+  OrderAction action = 3;
+  double quantity    = 4;
+  double confidence  = 5; // 0.0 - 1.0 — signal strength
+  string reason      = 6; // human-readable rationale
+  uint64 ts_ns       = 7;
+}
+
+// ─────────────────────────────────────────────
+// Risk Verdict — published by risk-engine-rust
+// ZMQ topic: "risk.approved" or "risk.rejected"
+// ─────────────────────────────────────────────
+message RiskVerdict {
+  TradeIntent intent     = 1;
+  bool        approved   = 2;
+  string      rejection_reason = 3; // empty if approved
+  double      approved_qty     = 4; // may differ from intent (partial approval)
+  uint64      latency_us = 5;
+}
+
+// ─────────────────────────────────────────────
+// Order — published to executor-python after risk approval
+// ZMQ topic: "risk.approved"
+// ─────────────────────────────────────────────
+message Order {
+  string      order_id    = 1;
+  string      symbol      = 2;
+  OrderAction action      = 3;
+  double      quantity    = 4;
+  OrderType   order_type  = 5;
+  double      limit_price = 6; // only for LMT
+  double      stop_price  = 7; // only for STP
+  string      strategy_id = 8;
+  uint64      ts_ns       = 9;
+}
+
+// ─────────────────────────────────────────────
+// Fill — published by executor-python after execution
+// ZMQ topic: "execution.fill"
+// ─────────────────────────────────────────────
+message Fill {
+  string      order_id    = 1;
+  string      symbol      = 2;
+  OrderAction action      = 3;
+  double      filled_qty  = 4;
+  double      avg_price   = 5;
+  OrderStatus status      = 6;
+  double      commission  = 7;
+  string      strategy_id = 8;
+  uint64      ts_ns       = 9;
+}
+
+// ─────────────────────────────────────────────
+// Account Update — published by executor-python
+// ZMQ topic: "account.update"
+// ─────────────────────────────────────────────
+message AccountUpdate {
+  string account_id      = 1;
+  double net_liquidation = 2;
+  double available_funds = 3;
+  double unrealized_pnl  = 4;
+  double realized_pnl    = 5;
+  double gross_position  = 6;
+  uint64 ts_ns           = 7;
+}
+
+// ─────────────────────────────────────────────
+// Heartbeat — published by every service
+// ZMQ topic: "system.heartbeat"
+// ─────────────────────────────────────────────
+message Heartbeat {
+  string service_name = 1;
+  string status       = 2; // "ok" | "degraded" | "error"
+  string version      = 3;
+  uint64 ts_ns        = 4;
+}

@@ -1,0 +1,209 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════════════
+# AlphaWolf 3.0v — Event-Driven Multi-Language Trading System
+#
+# Architecture: ZeroMQ Event Bus + Protobuf
+# Transport:    ZMQ PUB/SUB with topic filtering
+# Execution:    IB Gateway (paper port 4002 / live port 4001)
+#
+# Usage:
+#   make paper    →  BROKER_MODE=paper docker-compose up
+#   make ib-paper →  BROKER_MODE=live IB_PORT=4002 docker-compose up
+#   make live     →  BROKER_MODE=live IB_PORT=4001 docker-compose up  ⚠️
+# ═══════════════════════════════════════════════════════════════════════
+
+networks:
+  alphawolf:
+    driver: bridge
+
+volumes:
+  ib-gateway-data:
+  questdb-data:
+
+services:
+
+  # ─────────────────────────────────────────────────────────
+  # IB Gateway (Phase 7+)
+  # Provides market data and order execution via TWS API
+  # Paper:  port 4002
+  # Live:   port 4001  ← DO NOT USE without testing
+  # ─────────────────────────────────────────────────────────
+  ib-gateway:
+    image: ghcr.io/gnzsnz/ib-gateway:latest
+    container_name: alphawolf-ib-gateway
+    profiles: ["ib"]          # only starts with: --profile ib
+    ports:
+      - "4002:4002"           # paper API
+      - "4001:4001"           # live API
+      - "5900:5900"           # VNC (debug only)
+    environment:
+      TWS_USERID:   ${IB_USERNAME}
+      TWS_PASSWORD: ${IB_PASSWORD}
+      TRADING_MODE: ${IB_TRADING_MODE:-paper}
+      VNC_SERVER_PASSWORD: alphawolf_vnc
+    volumes:
+      - ib-gateway-data:/root/Jts
+      - ./config/ibc:/root/ibc:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "4002"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - alphawolf
+
+  # ─────────────────────────────────────────────────────────
+  # market-data-python
+  # Publishes MarketData to ZMQ topic "market.data"
+  # Phase 1+: PaperBroker (no IB)
+  # Phase 7+: IBGatewayBroker (requires ib-gateway profile)
+  # ─────────────────────────────────────────────────────────
+  market-data:
+    build:
+      context: .
+      dockerfile: services/market-data-python/Dockerfile
+    container_name: alphawolf-market-data
+    ports:
+      - "5555:5555"
+    environment:
+      BROKER_MODE:  ${BROKER_MODE:-paper}
+      ZMQ_PUB_PORT: 5555
+      SYMBOLS:      ${SYMBOLS:-AAPL,TSLA,NVDA,SPY,QQQ}
+      IB_HOST:      ib-gateway
+      IB_PORT:      ${IB_PORT:-4002}
+      IB_CLIENT_ID: 1
+    restart: unless-stopped
+    networks:
+      - alphawolf
+    healthcheck:
+      test: ["CMD", "python", "-c", "import zmq; ctx=zmq.Context(); s=ctx.socket(zmq.SUB); s.connect('tcp://localhost:5555'); ctx.destroy()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────
+  # brain-python
+  # Trading strategy engine
+  # SUB: market.data → PUB: signal.intent
+  # ─────────────────────────────────────────────────────────
+  brain:
+    build:
+      context: .
+      dockerfile: services/brain-python/Dockerfile
+    container_name: alphawolf-brain
+    ports:
+      - "5556:5556"
+    environment:
+      ZMQ_SUB_HOST:     market-data
+      ZMQ_SUB_PORT:     5555
+      ZMQ_PUB_PORT:     5556
+      STRATEGY_CONFIG:  /app/config/strategies.yaml
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      - market-data
+    restart: unless-stopped
+    networks:
+      - alphawolf
+
+  # ─────────────────────────────────────────────────────────
+  # risk-engine-rust
+  # High-performance risk validation
+  # SUB: signal.intent → PUB: risk.approved | risk.rejected
+  # ─────────────────────────────────────────────────────────
+  risk-engine:
+    build:
+      context: .
+      dockerfile: services/risk-engine-rust/Dockerfile
+    container_name: alphawolf-risk-engine
+    ports:
+      - "5557:5557"   # approved orders
+      - "5559:5559"   # rejected orders tap
+    environment:
+      ZMQ_SUB_HOST:       brain
+      ZMQ_SUB_PORT:       5556
+      ZMQ_PUB_APPROVED:   5557
+      ZMQ_PUB_REJECTED:   5559
+      RISK_CONFIG:        /app/config/risk_limits.yaml
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      - brain
+    restart: unless-stopped
+    networks:
+      - alphawolf
+
+  # ─────────────────────────────────────────────────────────
+  # executor-python
+  # Order execution via IB Gateway or PaperExecutor
+  # SUB: risk.approved → execute → PUB: execution.fill
+  # ─────────────────────────────────────────────────────────
+  executor:
+    build:
+      context: .
+      dockerfile: services/executor-python/Dockerfile
+    container_name: alphawolf-executor
+    ports:
+      - "5558:5558"
+    environment:
+      BROKER_MODE:      ${BROKER_MODE:-paper}
+      ZMQ_SUB_HOST:     risk-engine
+      ZMQ_SUB_PORT:     5557
+      ZMQ_PUB_PORT:     5558
+      INITIAL_CAPITAL:  ${INITIAL_CAPITAL:-100000}
+      IB_HOST:          ib-gateway
+      IB_PORT:          ${IB_PORT:-4002}
+      IB_CLIENT_ID:     2
+      ACCOUNT_POLL_S:   30
+    depends_on:
+      - risk-engine
+    restart: unless-stopped
+    networks:
+      - alphawolf
+
+  # ─────────────────────────────────────────────────────────
+  # analytics-java (Spring Boot)
+  # Subscribes to ALL topics → persists to QuestDB
+  # REST API for querying P&L, positions, fills
+  # ─────────────────────────────────────────────────────────
+  analytics:
+    build:
+      context: .
+      dockerfile: services/analytics-java/Dockerfile
+    container_name: alphawolf-analytics
+    ports:
+      - "8080:8080"
+    environment:
+      ZMQ_MARKET_DATA_HOST: market-data
+      ZMQ_MARKET_DATA_PORT: 5555
+      ZMQ_FILLS_HOST:       executor
+      ZMQ_FILLS_PORT:       5558
+      ZMQ_RISK_HOST:        risk-engine
+      ZMQ_RISK_PORT:        5559
+      QUESTDB_HOST:         questdb
+      QUESTDB_PORT:         9000
+    depends_on:
+      - executor
+      - questdb
+    restart: unless-stopped
+    networks:
+      - alphawolf
+
+  # ─────────────────────────────────────────────────────────
+  # QuestDB — time-series database for all events
+  # ─────────────────────────────────────────────────────────
+  questdb:
+    image: questdb/questdb:8.1.1
+    container_name: alphawolf-questdb
+    ports:
+      - "9000:9000"   # REST API / UI
+      - "8812:8812"   # PostgreSQL wire protocol
+      - "9009:9009"   # InfluxDB line protocol
+    volumes:
+      - questdb-data:/root/.questdb
+    restart: unless-stopped
+    networks:
+      - alphawolf

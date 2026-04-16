@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────────────────
+# Strategy Configuration — brain-python
+# ─────────────────────────────────────────────────────────────
+
+active_strategies:
+  - vix_momentum
+
+strategies:
+  vix_momentum:
+    enabled: true
+    symbols:
+      - SPY
+      - QQQ
+      - AAPL
+      - TSLA
+      - NVDA
+    # Signal parameters
+    momentum_period: 20          # bars for momentum calculation
+    signal_threshold: 0.02       # minimum price move to generate signal
+    min_confidence: 0.65         # minimum confidence to publish intent
+    # Position sizing
+    position_size_pct: 5.0       # % of capital per trade
+    max_open_positions: 5        # concurrent open positions
