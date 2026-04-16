@@ -126,14 +126,18 @@ services:
       - "5557:5557"   # approved orders
       - "5559:5559"   # rejected orders tap
     environment:
-      ZMQ_SUB_HOST:       brain
-      ZMQ_SUB_PORT:       5556
+      ZMQ_MARKET_HOST:    market-data
+      ZMQ_MARKET_PORT:    5555
+      ZMQ_BRAIN_HOST:     brain
+      ZMQ_BRAIN_PORT:     5556
       ZMQ_PUB_APPROVED:   5557
       ZMQ_PUB_REJECTED:   5559
       RISK_CONFIG:        /app/config/risk_limits.yaml
+      HEARTBEAT_INTERVAL_S: 10
     volumes:
       - ./config:/app/config:ro
     depends_on:
+      - market-data
       - brain
     restart: unless-stopped
     networks:
