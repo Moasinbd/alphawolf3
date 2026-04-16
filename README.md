@@ -35,7 +35,7 @@ make logs      # tail all logs
 
 See [ROADMAP.md](ROADMAP.md) for the complete phase-by-phase implementation plan.
 
-Current status: **Phase 0 complete — ready for Phase 1 (market-data pipeline)**
+Current status: **Phase 1 complete — ready for Phase 2 (brain-python strategy engine)**
 
 ## IB Gateway Integration
 

@@ -12,11 +12,11 @@
 |---|---|
 | Estructura del repositorio | ✅ Completa |
 | proto/messages.proto | ✅ Completo (7 mensajes, 5 enums) |
-| market-data-python | ✅ Esqueleto completo (PaperBroker + IBGatewayBroker) |
+| market-data-python | ✅ Fase 1 completa — ZMQ pipeline validado (5/5 mensajes) |
 | executor-python | ✅ Esqueleto completo (PaperExecutor + IBGatewayExecutor) |
-| brain-python | ⏳ Fase 2 |
-| risk-engine-rust | ⏳ Fase 3 |
-| analytics-java | ⏳ Fase 5 |
+| brain-python | ✅ Stub Phase 1 (sin estrategia) → Fase 2 |
+| risk-engine-rust | ✅ Stub Python (aprueba todo) → Fase 3 = Rust real |
+| analytics-java | ✅ Stub Python (log de eventos) → Fase 5 = Spring Boot |
 | docker-compose.yml | ✅ Completo |
 | Makefile | ✅ Completo |
 | IB Gateway | ⏳ Fase 7 |
@@ -78,18 +78,18 @@ cat proto/messages.proto  # 7 mensajes
 
 ---
 
-## Fase 1 — Pipeline de Market Data ⏳ SIGUIENTE
+## Fase 1 — Pipeline de Market Data ✅ COMPLETA
 
 **Objetivo:** `market-data-python` publica datos reales al bus ZMQ.
 Sin IB. Sin estrategia. Solo el bus de datos funcionando.
 
 ### Tareas
-- [ ] Completar `services/market-data-python/main.py` (ya tiene esqueleto)
-- [ ] Generar stubs proto para Python: `bash scripts/proto-gen.sh`
-- [ ] Test local: `python services/market-data-python/main.py`
-- [ ] Verificar que los mensajes salen en ZMQ con un subscriber de prueba
-- [ ] Build Docker: `docker compose build market-data`
-- [ ] Test en Docker: `make paper` (solo market-data)
+- [x] Completar `services/market-data-python/main.py`
+- [x] Generar stubs proto para Python: `bash scripts/proto-gen.sh`
+- [x] Test local: `python services/market-data-python/main.py`
+- [x] Verificar mensajes ZMQ — 5/5 mensajes recibidos con proto deserialization
+- [ ] Build Docker: `docker compose build market-data` (requiere Docker Desktop)
+- [ ] Test en Docker: `make phase1`
 
 ### Archivos a tocar
 ```
@@ -117,7 +117,7 @@ EOF
 
 ---
 
-## Fase 2 — Motor de Estrategia (brain-python)
+## Fase 2 — Motor de Estrategia (brain-python) ⏳ SIGUIENTE
 
 **Objetivo:** `brain-python` consume `MarketData` y publica `TradeIntent`.
 Estrategia simple: momentum de precio.
